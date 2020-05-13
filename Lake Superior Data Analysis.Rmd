@@ -1,0 +1,186 @@
+---
+title: "GEOG 592 Chlorophyll Data Analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r message=FALSE,warning=FALSE}
+library(readr)
+library(plyr)
+library(tidyverse)
+library(mosaic)
+library(lubridate)
+library(DataCombine)
+library(MASS)
+
+test = read_csv("/Users/reidbrown/Documents/Senior/Spring 2020/GEOG 592/CSV Chlorophyll Files/Chlorophyll Zip File/A20170602017090_stats.csv")
+head(test)
+
+#Dec2013Data = read_csv("/Users/reidbrown/Documents/Senior/Spring 2020/GEOG 592/CSV Chlorophyll Files/Chlorophyll Zip File/A20133352013365_stats.csv")
+#Dec2017Data = read_csv("/Users/reidbrown/Documents/Senior/Spring 2020/GEOG 592/CSV Chlorophyll Files/Chlorophyll Zip File/A20173352017365_stats.csv")
+
+#These two .csv files did not output the zonal statistics, I need them in my dataframe later to preserve the order of months. They will be removed after. The data for these months was empty. 
+
+Dec2013Data = data.frame(OBJECTID=character(1),OID_=character(1),COUNT=character(1), AREA = character(1), MIN = character(1), MAX = character(1), RANGE = character(1), MEAN = character(1), STD = character(1), SUM = character(1), date = character(1))
+head(Dec2013Data)
+
+Dec2017Data = data.frame(OBJECTID=character(1),OID_=character(1),COUNT=character(1), AREA = character(1), MIN = character(1), MAX = character(1), RANGE = character(1), MEAN = character(1), STD = character(1), SUM = character(1), date = character(1))
+head(Dec2017Data)
+
+Dec2013Data$OBJECTID = -1
+Dec2013Data[,2:10] = 0
+Dec2013Data$date = 2013335
+Dec2013Data$YEAR = 2013
+Dec2013Data$DAY = 335
+
+Dec2017Data$OBJECTID = -1
+Dec2017Data[,2:10] = 0
+Dec2017Data$date = 2017335
+Dec2017Data$YEAR = 2017
+Dec2017Data$DAY = 335
+```
+
+```{r}
+#setwd("~/Desktop")
+mydir = "/Users/reidbrown/Documents/Senior/Spring 2020/GEOG 592/CSV Chlorophyll Files/Chlorophyll Zip File"
+myfiles = list.files(path=mydir, pattern="*.csv", full.names=TRUE)
+myfiles
+
+```
+
+```{r}
+LakeSuperiorChlr = ldply(myfiles, read_csv)
+head(LakeSuperiorChlr)
+
+```
+
+```{r}
+LakeSuperiorChlr_2 = LakeSuperiorChlr
+test = substr(LakeSuperiorChlr_2$date[1], 1, 4)
+test
+head(LakeSuperiorChlr_2)
+```
+
+```{r}
+#Generate seperate year column in dataframe
+
+for (year in LakeSuperiorChlr_2$date) {
+  LakeSuperiorChlr_2$YEAR = substr(LakeSuperiorChlr_2$date, 1, 4)
+}
+head(LakeSuperiorChlr_2)
+```
+
+```{r}
+#Make Day of Year col
+
+for (day in LakeSuperiorChlr_2$date) {
+  LakeSuperiorChlr_2$DAY = substr(LakeSuperiorChlr_2$date, 5, 7)
+}
+head(LakeSuperiorChlr_2)
+```
+
+
+
+```{r}
+#Combine empty rows for Dec2013 and Dec2017 with ZonalStats dataframe. This is done so that the below code will label the months correctly. 
+NewLakeSuperiorChlr = rbind(LakeSuperiorChlr_2, Dec2013Data,Dec2017Data)
+NewLakeSuperiorChlr = NewLakeSuperiorChlr[order(NewLakeSuperiorChlr$date),]
+```
+
+```{r}
+#Make MONTH col based on values from DAY col but with rep()
+NewLakeSuperiorChlr$MONTH <- rep(c(7,8,9,10,11,12,1,2,3,4,5,6), length=nrow(NewLakeSuperiorChlr))
+head(NewLakeSuperiorChlr)
+```
+
+```{r}
+#Drop the Dec2013 
+NewLakeSuperiorChlr_2 = subset(NewLakeSuperiorChlr, YEAR!=2013 | DAY!=335)
+NewLakeSuperiorChlr_2
+```
+
+```{r}
+#Drop the Dec2017 
+NewLakeSuperiorChlr_3 = subset(NewLakeSuperiorChlr_2, YEAR!=2017 | DAY!=335)
+NewLakeSuperiorChlr_3
+```
+
+```{r}
+#Drop 2020 months since it is an incomplete year
+NewLakeSuperiorChlr_4 = subset(NewLakeSuperiorChlr_3, YEAR!=2020)
+NewLakeSuperiorChlr_4
+```
+
+```{r}
+FinalLakeSuperiorChlorData = NewLakeSuperiorChlr_4
+FinalLakeSuperiorChlorData %>% mutate_if(is.character,as.numeric)
+head(FinalLakeSuperiorChlorData)
+```
+
+
+```{r}
+ChlorMod = aov(MEAN~MONTH, data = FinalLakeSuperiorChlorData)
+plot(MEAN~MONTH, data = FinalLakeSuperiorChlorData, main = "Mean Chl-a Content By Month (2002-2019)")
+abline(ChlorMod, col="blue")
+summary(ChlorMod)
+```
+
+```{r}
+ChlorMod2 = lm(MEAN~YEAR, data = FinalLakeSuperiorChlorData)
+plot(MEAN~YEAR, data = FinalLakeSuperiorChlorData, main = "Mean Chl-a Content By Year (2002-2019)")
+abline(ChlorMod2, col="blue")
+summary(ChlorMod2)
+```
+
+```{r}
+ChlorMod3 = lm(MEAN~factor(MONTH)+YEAR, FinalLakeSuperiorChlorData)
+summary(ChlorMod3)
+```
+
+```{r}
+ChlorYearlyTS = ts(FinalLakeSuperiorChlorData, start=c(2002), end=c(2019), frequency=1) # Yearly Data
+ChlorYearlyTS
+```
+
+```{r}
+#Get top 10 highest chlorophyll mean values
+which.max(FinalLakeSuperiorChlorData$MEAN)
+FinalLakeSuperiorChlorData[126,]
+
+```
+
+```{r}
+which.min(FinalLakeSuperiorChlorData$MEAN)
+FinalLakeSuperiorChlorData[139,]
+```
+
+```{r}
+plot(ChlorMod)
+hist(ChlorMod$residuals)
+```
+
+Index 126 has moderatly high leverage according to the Residuals vs Leverage plot. Looking at the QQ plot, the data seems normally distributed outside of this one point. The residuals appear to be centered around the horizontal reference line indicating zero mean of the residuals. There appears to be a lot of right skew accoring to the histogram, again this is likely due to the outlier at index 126. 
+
+```{r}
+FinalLakeSuperiorChlorData2 = FinalLakeSuperiorChlorData[-c(126),]
+NewChlorMod = lm(MEAN~MONTH, data = FinalLakeSuperiorChlorData2)
+plot(MEAN~MONTH, data = FinalLakeSuperiorChlorData2, main = "New Mean Chl-a Content By Month (2002-2019)")
+abline(NewChlorMod, col="blue")
+summary(NewChlorMod)
+```
+
+Data fits better in window now. 
+
+```{r}
+#New residual analysis
+plot(NewChlorMod)
+hist(NewChlorMod$residuals)
+```
+
+Histogram and QQ plot show normality of data. Because predictor is categorical the vertical spread of the residuals seems to be centered around 0 except for the summer months, indcating some kind of seasonal trend in the data. 
+
+As AREA decreases, MEAN increases. 
+
+Big drought in the Great Lakes in late fall to winter in 2012.
+
